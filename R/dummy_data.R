@@ -120,5 +120,4 @@ final_data <- full_join(opp_final, calls_final) %>%
   # add in acct name
   left_join(select(account_info, acct_id, acct_name), by = c("event_acct_id" = "acct_id")) %>% 
   mutate(x_axis = 0) %>% 
-  filter(acct_name == "Merck") %>% 
   filter(between(event_date, min(month_date_range), max(month_date_range)))
