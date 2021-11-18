@@ -1,0 +1,14 @@
+name: acct_timeline
+title: acct_timeline
+username: ryan
+account: ryan
+server: connect.rstudioservices.com
+hostUrl: https://connect.rstudioservices.com/__api__
+appId: 7825
+bundleId: 152315
+url: https://connect.rstudioservices.com/content/89ff647c-52c2-48ab-88fe-e9ea829b5612/
+when: 1637197107.61252
+lastSyncTime: 1637197107.61253
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: timeline_plot.R
