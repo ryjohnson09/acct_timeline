@@ -4,6 +4,7 @@ library(lubridate)
 library(gt)
 library(ggrepel)
 library(pins)
+library(scales)
 
 # Read in Data ---------------------------------
 #board <- board_rsconnect(server = "https://connect.rstudioservices.com")
@@ -21,8 +22,20 @@ month_year_data <- tibble(floor_date(date_range, unit = "month")) %>%
 
 ui <- fluidPage(
   fluidRow(column(12, align="center",
-                  selectInput("acct_name", "", choices = unique(timeline_data$acct_name), selected = "Merck"),
-                  plotOutput("plot", click = "plot_click", width = "800px", height = "800px"))),
+                  # Account Name
+                  selectInput("acct_name", "", 
+                              choices = sort(unique(timeline_data$acct_name)), 
+                              selected = "Amgen"),
+                  # Engagement Type
+                  checkboxGroupInput("engagement_type", "",
+                                     choices = c("Sales", "CS", "Support"), 
+                                     selected = c("Sales", "CS"), 
+                                     inline = TRUE),
+                  # Plot
+                  plotOutput("plot", click = "plot_click", 
+                             width = "800px", 
+                             height = "800px"
+                             ))),
   gt_output("data")
 )
 server <- function(input, output, session) {
@@ -33,7 +46,9 @@ server <- function(input, output, session) {
       # Filter for account name
       filter(acct_name == input$acct_name) %>% 
       # Filter for date range
-      filter(between(event_date, min(date_range), max(date_range)))
+      filter(between(event_date, min(date_range), max(date_range))) %>% 
+      # Filter for point type
+      filter(event_type %in% input$engagement_type)
   })
   
   output$plot <- renderPlot({
@@ -57,7 +72,16 @@ server <- function(input, output, session) {
             axis.line.x = element_blank(), 
             legend.position = "none"
       ) +
-      geom_point(aes(fill = event_type), pch = 21, size = 3, color = "black") +
+      # Sales points
+      geom_point(data = filter(timeline_data_filt(), event_type == "Sales"),
+                       fill = "#f9c74f", pch = 21, size = 3, color = "black") +
+      # CS points
+      geom_point(data = filter(timeline_data_filt(), event_type == "CS"),
+                 fill = "#4d908e", pch = 21, size = 3, color = "black") +
+      # Support points
+      geom_point(data = filter(timeline_data_filt(), event_type == "Support"),
+                 fill = "#f94144", pch = 21, size = 3, color = "black") +
+      # Date labels
       geom_text(data = month_year_data, 
                 aes(y = date_range, 
                     x = 0.05, 
@@ -69,10 +93,13 @@ server <- function(input, output, session) {
                     label = year_label),
                 size = 3, 
                 color = "grey") +
+      # Point labels
       geom_label_repel(data = filter(timeline_data_filt(), event_type == "Sales"),
-                       aes(fill = event_subtype), nudge_x = -0.6, size = 2.5) +
+                       aes(fill = event_label), nudge_x = -0.7, size = 2) +
       geom_label_repel(data = filter(timeline_data_filt(), event_type == "CS"), 
-                       aes(fill = event_subtype),nudge_x = 0.6, size = 2.5)
+                       aes(fill = event_subtype),nudge_x = 0.6, size = 2) +
+      geom_label_repel(data = filter(timeline_data_filt(), event_type == "Support"), 
+                       aes(fill = event_subtype),nudge_x = -0.3, size = 2)
   }, res = 96)
   
   # Table under plot
@@ -81,12 +108,19 @@ server <- function(input, output, session) {
       gt() %>%
       cols_hide(
         columns = c(
-          event_type, x_axis, event_acct_id, acct_name
+          event_type, x_axis, event_acct_id, 
+          acct_name, event_date, event_label,
+          event_subtype
         )
       ) %>% 
       fmt_markdown(columns = event_notes) %>% 
+      cols_align(
+        align = c("left"),
+        columns = everything()
+      ) %>% 
       tab_options(#table.width = px(600), 
-                  table.font.size = "90%")
+                  table.font.size = "90%",
+                  column_labels.hidden = TRUE)
   })
 }
 

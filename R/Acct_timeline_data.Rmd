@@ -12,6 +12,7 @@ library(odbc)
 library(DBI)
 library(dbplyr)
 library(pins)
+library(scales)
 ```
 
 
@@ -55,6 +56,8 @@ opps <- tbl(con, in_schema("salesforce", "opportunity")) %>%
          opp_products = product_interest_c,
          license_start_date = license_start_date_c,
          license_end_date = license_end_date_c) %>%
+  mutate(opp_amount = dollar(opp_amount)) %>% 
+  mutate(opp_summary = glue::glue('### {opp_name}\r\n**{opp_stage} - {opp_type}**\r\n\n**Close Date**: {opp_close_date}\r\n\n**Opp Amount**: <span style="color:green">{opp_amount}</span>\r\n#### Products\r\n#### Opp Info')) %>%
   filter(acct_id %in% account_info$acct_id)
 
 # Create final opp table
@@ -62,7 +65,7 @@ opp_final <- opps %>%
   select(event_subtype = opp_stage,
          event_date = opp_close_date,
          event_label = opp_type,
-         event_notes = opp_name,
+         event_notes = opp_summary,
          event_acct_id = acct_id) %>%
   mutate(event_type = "Sales") %>% 
   select(event_type, event_subtype, everything())
@@ -108,14 +111,67 @@ calls_final <- calls %>%
   select(event_type, everything())
 ```
 
-# Create final data and pin
+
+# Create merged opp + call
 ```{r}
-final_data <- full_join(opp_final, calls_final) %>% 
+opp_calls <- full_join(opp_final, calls_final) %>% 
   # add in acct name
   left_join(select(account_info, acct_id, acct_name), by = c("event_acct_id" = "acct_id")) %>% 
   # add in arbitrary x_axis for unique ggplot
   mutate(x_axis = 0)
+```
 
+
+# Support ticket items
+```{r}
+# Get support ticket pin
+support_tickets <- pin_read(board, "amanda/support_tickets")
+
+LSH_Ent_tickets <- support_tickets %>% 
+  # fitler for just support tickets
+  filter(group_name == "Support") %>% 
+  select(ticket_id = id,
+         ticket_created = created_at,
+         ticket_solved_date = solved_at,
+         ticket_closed_at = closed_at,
+         ticket_subject = subject,
+         ticket_description = description,
+         ticket_priority = priority,
+         ticket_status = status, 
+         ticket_account = org_name,
+         ticket_requester = requester_name,
+         ticket_requester_email = requester_email) %>% 
+  filter(ticket_account %in% account_info$acct_name) %>% 
+  mutate(ticket_label = glue::glue('Ticket: {ticket_status}')) %>%
+  mutate(ticket_link = glue::glue("https://rstudioide.zendesk.com/agent/tickets/{ticket_id}")) %>% 
+  mutate(ticket_summary = glue::glue('### [{ticket_id}]({ticket_link})\r\n**Status**: {ticket_status}\r\n\n**Requester**: [{ticket_requester}]({ticket_requester_email})'))
+  
+# Final ticket data
+ticket_final <- LSH_Ent_tickets %>% 
+  select(event_subtype = ticket_status,
+         event_date = ticket_created,
+         event_label = ticket_label,
+         event_notes = ticket_summary,
+         acct_name = ticket_account) %>% 
+  mutate(event_type = "Support") %>% 
+  left_join(select(account_info, acct_id, acct_name), by = "acct_name") %>% 
+  rename(event_acct_id = acct_id) %>% 
+  mutate(event_date = lubridate::as_date(event_date)) %>% 
+  select(event_type, event_subtype, event_date,
+         event_label, event_notes, event_acct_id, 
+         acct_name) %>%
+  mutate(x_axis = 0)
+```
+
+# Merge opp + call and tickets
+```{r}
+final_data <- opp_calls %>% 
+  full_join(ticket_final)
+```
+
+
+# Pin Data
+```{r}
 # Pin
 board <- pins::board_rsconnect(server = "connect.rstudioservices.com")
 board %>% 
