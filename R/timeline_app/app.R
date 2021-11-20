@@ -20,8 +20,7 @@ month_year_data <- tibble(floor_date(date_range, unit = "month")) %>%
   mutate(year_label = year(date_range))
 
 
-ui <- fluidPage(
-  fluidRow(column(12, align="center",
+ui <- fillPage(column(12, align="center",
                   # Account Name
                   selectInput("acct_name", "", 
                               choices = sort(unique(timeline_data$acct_name)), 
@@ -30,14 +29,14 @@ ui <- fluidPage(
                   checkboxGroupInput("engagement_type", "",
                                      choices = c("Sales", "CS", "Support"), 
                                      selected = c("Sales", "CS"), 
-                                     inline = TRUE),
+                                     inline = TRUE)),
                   # Plot
                   plotOutput("plot", click = "plot_click", 
-                             width = "800px", 
-                             height = "800px"
-                             ))),
-  gt_output("data")
+                             width = "100%",
+                             height = "75%"
+                             )
 )
+
 server <- function(input, output, session) {
   
   # filter data
@@ -84,23 +83,32 @@ server <- function(input, output, session) {
       # Date labels
       geom_text(data = month_year_data, 
                 aes(y = date_range, 
-                    x = 0.05, 
+                    x = 0.01, 
                     label = month_label), 
-                size = 3) +
+                size = 3, hjust = "left") +
       geom_text(data = month_year_data,
                 aes(y = date_range,
-                    x = -0.05, 
+                    x = -0.01, 
                     label = year_label),
-                size = 3, 
+                size = 3, hjust = "right",
                 color = "grey") +
       # Point labels
       geom_label_repel(data = filter(timeline_data_filt(), event_type == "Sales"),
                        aes(fill = event_label), nudge_x = -0.7, size = 2) +
-      geom_label_repel(data = filter(timeline_data_filt(), event_type == "CS"), 
+      geom_label_repel(data = filter(timeline_data_filt(), event_type == "CS"),
                        aes(fill = event_subtype),nudge_x = 0.6, size = 2) +
-      geom_label_repel(data = filter(timeline_data_filt(), event_type == "Support"), 
+      geom_label_repel(data = filter(timeline_data_filt(), event_type == "Support"),
                        aes(fill = event_subtype),nudge_x = -0.3, size = 2)
   }, res = 96)
+  
+  # Shiny alert showing plot
+  observeEvent(input$plot_click, {
+    showModal(modalDialog(
+        gt_output("data"),
+        easyClose = TRUE
+      ))
+  })
+  
   
   # Table under plot
   output$data <- render_gt({

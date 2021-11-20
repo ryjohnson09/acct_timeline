@@ -13,6 +13,8 @@ library(DBI)
 library(dbplyr)
 library(pins)
 library(scales)
+
+board <- pins::board_rsconnect(server = "connect.rstudioservices.com")
 ```
 
 
@@ -34,7 +36,6 @@ account_info <- tbl(con, in_schema("salesforce", "account")) %>%
   filter(pod_team_c == "Ent LSH") %>% 
   filter(is_deleted == "0") %>% 
   filter(type == "Customer") %>% 
-  filter(customer_success_team_member_c == "0050L000009iXh7QAE") %>% 
   collect() %>% 
   select(acct_id = id, acct_name = name,
          acct_cs_owner_id = customer_success_team_member_c,
@@ -76,7 +77,8 @@ opp_final <- opps %>%
 # Get call notes
 calls <- dplyr::tbl(con, in_schema("salesforce", "task")) %>%
   filter(account_id %in% !!account_info$acct_id) %>%
-  filter(owner_id %in% c("0050L000009iXh7QAE")) %>%
+  # Select all calls from both CS and Sales
+  filter(owner_id %in% !!unique(c(account_info$acct_cs_owner_id, account_info$acct_owner_id))) %>%
   select(
     call_id = id,
     call_subject = subject,
@@ -102,12 +104,18 @@ calls <- dplyr::tbl(con, in_schema("salesforce", "task")) %>%
 
 # Create final call table
 calls_final <- calls %>% 
-  select(event_subtype = call_category,
+  # If logged by account owner == Sales, 
+  # If logged by CS == CS
+  mutate(event_type = case_when(
+    call_owner_id %in% unique(account_info$acct_owner_id) ~ "Sales",
+    call_owner_id %in% unique(account_info$acct_cs_owner_id) ~ "CS"
+  )) %>% 
+  select(event_type,
+         event_subtype = call_category,
          event_date = call_date,
          event_label = call_category,
          event_notes = call_description,
          event_acct_id = call_acct_id) %>% 
-  mutate(event_type = "CS") %>% 
   select(event_type, everything())
 ```
 
@@ -144,7 +152,7 @@ LSH_Ent_tickets <- support_tickets %>%
   filter(ticket_account %in% account_info$acct_name) %>% 
   mutate(ticket_label = glue::glue('Ticket: {ticket_status}')) %>%
   mutate(ticket_link = glue::glue("https://rstudioide.zendesk.com/agent/tickets/{ticket_id}")) %>% 
-  mutate(ticket_summary = glue::glue('### [{ticket_id}]({ticket_link})\r\n**Status**: {ticket_status}\r\n\n**Requester**: [{ticket_requester}]({ticket_requester_email})'))
+  mutate(ticket_summary = glue::glue('### [{ticket_id}]({ticket_link}) - {ticket_subject}\r\n**Date Opened**: {ticket_created}\r\n\n**Status**: {ticket_status}\r\n\n**Requester**: [{ticket_requester}]({ticket_requester_email})'))
   
 # Final ticket data
 ticket_final <- LSH_Ent_tickets %>% 
@@ -173,7 +181,6 @@ final_data <- opp_calls %>%
 # Pin Data
 ```{r}
 # Pin
-board <- pins::board_rsconnect(server = "connect.rstudioservices.com")
 board %>% 
   pin_write(final_data, "acct_timeline_data", type = "rds")
 ```
