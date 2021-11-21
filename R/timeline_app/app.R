@@ -7,8 +7,8 @@ library(pins)
 library(scales)
 
 # Read in Data ---------------------------------
-#board <- board_rsconnect(server = "https://connect.rstudioservices.com")
-board <- board_rsconnect(server = "connect.rstudioservices.com")
+board <- board_rsconnect(server = "https://connect.rstudioservices.com") # Running on RSC
+#board <- board_rsconnect(server = "connect.rstudioservices.com") # Running locally
 timeline_data <- pin_read(board, "ryan/acct_timeline_data")
 
 # Month/Year Data

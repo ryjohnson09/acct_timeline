@@ -14,7 +14,8 @@ library(dbplyr)
 library(pins)
 library(scales)
 
-board <- pins::board_rsconnect(server = "connect.rstudioservices.com")
+#board <- pins::board_rsconnect(server = "connect.rstudioservices.com") # Running locally
+board <- pins::board_rsconnect(server = "https://connect.rstudioservices.com") # Running on RSC
 ```
 
 
@@ -56,9 +57,13 @@ opps <- tbl(con, in_schema("salesforce", "opportunity")) %>%
          opp_type = type,
          opp_products = product_interest_c,
          license_start_date = license_start_date_c,
-         license_end_date = license_end_date_c) %>%
+         license_end_date = license_end_date_c,
+         opp_closed_lost_details = closed_lost_details_c,
+         opp_closed_won_details = closed_won_details_c,
+         opp_deal_summary = deal_summary_c,
+         opp_next_steps = next_steps_c) %>%
   mutate(opp_amount = dollar(opp_amount)) %>% 
-  mutate(opp_summary = glue::glue('### {opp_name}\r\n**{opp_stage} - {opp_type}**\r\n\n**Close Date**: {opp_close_date}\r\n\n**Opp Amount**: <span style="color:green">{opp_amount}</span>\r\n#### Products\r\n#### Opp Info')) %>%
+  mutate(opp_summary = glue::glue('### {opp_name}\r\n* **{opp_stage} - {opp_type}**\r\n\n* **Close Date**: {opp_close_date}\r\n\n* **Opp Amount**: <span style="color:green">{opp_amount}</span>\r\n#### Products\r\n{opp_products}\r\n##### Closed Won Details\r\n{opp_closed_won_details}\r\n##### Closed Lost Details\r\n{opp_closed_lost_details}\r\n##### Deal Summary\r\n{opp_deal_summary}\r\n##### Next Steps\r\n{opp_next_steps}\n\n')) %>%
   filter(acct_id %in% account_info$acct_id)
 
 # Create final opp table
