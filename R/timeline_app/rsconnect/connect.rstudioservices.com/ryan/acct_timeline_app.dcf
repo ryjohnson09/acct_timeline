@@ -5,9 +5,9 @@ account: ryan
 server: connect.rstudioservices.com
 hostUrl: https://connect.rstudioservices.com/__api__
 appId: 7860
-bundleId: 153850
+bundleId: 154765
 url: https://connect.rstudioservices.com/acct_timeline/
-when: 1637506416.86665
-lastSyncTime: 1637506416.86666
+when: 1637695858.85634
+lastSyncTime: 1637695858.85635
 asMultiple: FALSE
 asStatic: FALSE
