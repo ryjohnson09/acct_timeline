@@ -20,20 +20,23 @@ month_year_data <- tibble(floor_date(date_range, unit = "month")) %>%
 
 
 ui <- fillPage(column(12, align="center",
-                  # Account Name
-                  selectInput("acct_name", "", 
-                              choices = sort(unique(timeline_data$acct_name)), 
-                              selected = "Amgen"),
-                  # Engagement Type
-                  checkboxGroupInput("engagement_type", "",
-                                     choices = c("Sales", "CS", "Support"), 
-                                     selected = c("Sales", "CS"), 
-                                     inline = TRUE)),
-                  # Plot
-                  plotOutput("plot", click = "plot_click", 
-                             width = "100%",
-                             height = "75%"
-                             )
+                      # Pod Filter
+                      
+                      
+                      # Account Name
+                      selectInput("acct_name", "", 
+                                  choices = sort(unique(timeline_data$acct_name)), 
+                                  selected = "Amgen"),
+                      # Engagement Type
+                      checkboxGroupInput("engagement_type", "",
+                                         choices = c("Sales", "CS", "Support"), 
+                                         selected = c("Sales", "CS"), 
+                                         inline = TRUE)),
+                      # Plot
+                      plotOutput("plot", click = "plot_click", 
+                                 width = "100%",
+                                 height = "75%"
+                                 )
 )
 
 server <- function(input, output, session) {

@@ -29,14 +29,20 @@ board <- board_rsconnect(server = Sys.getenv("CONNECT_SERVER"))
 ```{r}
 # Get Account names
 account_info <- tbl(con, in_schema("salesforce_v1", "account")) %>%
-  #filter(pod_team_c == "Ent LSH") %>% 
   filter(is_deleted == "0") %>% 
   filter(type == "Customer") %>% 
   collect() %>% 
   select(acct_id = id, acct_name = name,
          acct_cs_owner_id = customer_success_team_member_c,
-         acct_owner_id = owner_id)
+         acct_owner_id = owner_id,
+         acct_pod = pod_team_c)
 
+# Get Rep ID and name
+reps <- tbl(con, in_schema("salesforce_v1", "user")) %>%
+  select(first_name, last_name, id) %>% 
+  collect() %>% 
+  unite("rep_name", c("first_name", "last_name"), sep = " ") %>% 
+  rename(owner_id = id)
 
 # Get Opps
 opps <- tbl(con, in_schema("salesforce_v1", "opportunity")) %>% 
@@ -93,13 +99,11 @@ calls <- dplyr::tbl(con, in_schema("salesforce_v1", "task")) %>%
     call_who_id = who_id,
     call_owner_id = owner_id,
     call_created_date = created_date,
-    call_created_by_id = created_by_id
-  ) %>%
-  collect() %>%
+    call_created_by_id = created_by_id) %>%
   mutate(label = case_when(
     (call_subtype == 'Call' & call_type == 'Call') ~ 'Call',
-    !is.na(call_subtype) ~ 'Email'
-  )) %>%
+    !is.na(call_subtype) ~ 'Email')) %>%
+  collect() %>%
   # Filter for just calls
   filter(label == "Call")
 
@@ -124,8 +128,8 @@ calls_final <- calls %>%
 # Create merged opp + call
 ```{r}
 opp_calls <- full_join(opp_final, calls_final) %>% 
-  # add in acct name
-  left_join(select(account_info, acct_id, acct_name), by = c("event_acct_id" = "acct_id")) %>% 
+  # add in acct info
+  left_join(account_info, by = c("event_acct_id" = "acct_id")) %>% 
   # add in arbitrary x_axis for unique ggplot
   mutate(x_axis = 0)
 ```
@@ -163,19 +167,24 @@ ticket_final <- all_tickets %>%
          event_notes = ticket_summary,
          acct_name = ticket_account) %>% 
   mutate(event_type = "Support") %>% 
-  left_join(select(account_info, acct_id, acct_name), by = "acct_name") %>% 
+  left_join(account_info, by = "acct_name") %>% 
   rename(event_acct_id = acct_id) %>% 
   mutate(event_date = lubridate::as_date(event_date)) %>% 
   select(event_type, event_subtype, event_date,
          event_label, event_notes, event_acct_id, 
-         acct_name) %>%
+         acct_name, acct_owner_id, acct_cs_owner_id) %>%
   mutate(x_axis = 0)
 ```
 
 # Merge opp + call and tickets
 ```{r}
 final_data <- opp_calls %>% 
-  full_join(ticket_final)
+  full_join(ticket_final) %>%
+  # add in rep names
+  left_join(reps, by = c("acct_owner_id" = "owner_id")) %>% 
+  rename(acct_owner_name = rep_name) %>% 
+  left_join(reps, by = c("acct_cs_owner_id" = "owner_id")) %>% 
+  rename(acct_cs_owner_name = rep_name)
 ```
 
 
