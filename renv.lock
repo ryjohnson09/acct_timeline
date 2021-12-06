@@ -821,6 +821,14 @@
       "Repository": "RSPM",
       "Hash": "0af818392e60673cd8968ab9119c30a7"
     },
+    "warehouse": {
+      "Package": "warehouse",
+      "Version": "0.5.1.0.0.0.1635967432",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "RemoteSha": "6ae1bf65d9af56954e1848fbb0befad25d068954",
+      "Hash": "9be0b22a6c72e7422b5c9de0dedaacdd"
+    },
     "whisker": {
       "Package": "whisker",
       "Version": "0.4",
