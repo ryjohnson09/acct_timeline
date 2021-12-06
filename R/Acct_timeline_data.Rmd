@@ -5,7 +5,7 @@ date: "11/18/2021"
 output: html_document
 ---
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(lubridate)
 library(odbc)
@@ -13,28 +13,23 @@ library(DBI)
 library(dbplyr)
 library(pins)
 library(scales)
-
-#board <- pins::board_rsconnect(server = "connect.rstudioservices.com") # Running locally
-board <- pins::board_rsconnect(server = "https://connect.rstudioservices.com") # Running on RSC
+library(warehouse)
 ```
 
-
-# Set up SF Warehouse connection
+# Setup connections
 ```{r}
-con <- DBI::dbConnect(odbc::odbc(),
-                      database = "marketing", 
-                      Driver = "Redshift",
-                      host = "redhouse.cyii7eabibhu.us-east-1.redshift.amazonaws.com", 
-                      port = 5439, 
-                      UID = Sys.getenv("WAREHOUSE_USER"), 
-                      PWD = Sys.getenv("WAREHOUSE_PASSWORD"))
+# RStudio Data Warehouse
+con <- lakehouse()
+
+# Register Pin Board
+board <- board_rsconnect(server = Sys.getenv("CONNECT_SERVER"))
 ```
 
 # Extract Account and Opp information
 ```{r}
 # Get Account names
-account_info <- tbl(con, in_schema("salesforce", "account")) %>%
-  filter(pod_team_c == "Ent LSH") %>% 
+account_info <- tbl(con, in_schema("salesforce_v1", "account")) %>%
+  #filter(pod_team_c == "Ent LSH") %>% 
   filter(is_deleted == "0") %>% 
   filter(type == "Customer") %>% 
   collect() %>% 
@@ -44,9 +39,10 @@ account_info <- tbl(con, in_schema("salesforce", "account")) %>%
 
 
 # Get Opps
-opps <- tbl(con, in_schema("salesforce", "opportunity")) %>% 
+opps <- tbl(con, in_schema("salesforce_v1", "opportunity")) %>% 
   filter(is_deleted == "0") %>%
   filter(!stage_name %in% c("Opportunity Disqualified")) %>% 
+  filter(account_id %in% !!account_info$acct_id) %>% 
   collect() %>% 
   select(opp_id = id, 
          acct_id = account_id, 
@@ -63,8 +59,7 @@ opps <- tbl(con, in_schema("salesforce", "opportunity")) %>%
          opp_deal_summary = deal_summary_c,
          opp_next_steps = next_steps_c) %>%
   mutate(opp_amount = dollar(opp_amount)) %>% 
-  mutate(opp_summary = glue::glue('### {opp_name}\r\n* **{opp_stage} - {opp_type}**\r\n\n* **Close Date**: {opp_close_date}\r\n\n* **Opp Amount**: <span style="color:green">{opp_amount}</span>\r\n#### Products\r\n{opp_products}\r\n##### Closed Won Details\r\n{opp_closed_won_details}\r\n##### Closed Lost Details\r\n{opp_closed_lost_details}\r\n##### Deal Summary\r\n{opp_deal_summary}\r\n##### Next Steps\r\n{opp_next_steps}\n\n')) %>%
-  filter(acct_id %in% account_info$acct_id)
+  mutate(opp_summary = glue::glue('### {opp_name}\r\n* **{opp_stage} - {opp_type}**\r\n\n* **Close Date**: {opp_close_date}\r\n\n* **Opp Amount**: <span style="color:green">{opp_amount}</span>\r\n#### Products\r\n{opp_products}\r\n##### Closed Won Details\r\n{opp_closed_won_details}\r\n##### Closed Lost Details\r\n{opp_closed_lost_details}\r\n##### Deal Summary\r\n{opp_deal_summary}\r\n##### Next Steps\r\n{opp_next_steps}\n\n'))
 
 # Create final opp table
 opp_final <- opps %>% 
@@ -80,7 +75,7 @@ opp_final <- opps %>%
 # Get Call Data
 ```{r}
 # Get call notes
-calls <- dplyr::tbl(con, in_schema("salesforce", "task")) %>%
+calls <- dplyr::tbl(con, in_schema("salesforce_v1", "task")) %>%
   filter(account_id %in% !!account_info$acct_id) %>%
   # Select all calls from both CS and Sales
   filter(owner_id %in% !!unique(c(account_info$acct_cs_owner_id, account_info$acct_owner_id))) %>%
@@ -102,7 +97,8 @@ calls <- dplyr::tbl(con, in_schema("salesforce", "task")) %>%
   ) %>%
   collect() %>%
   mutate(label = case_when(
-    (call_subtype == 'Call' & call_type == 'Call') ~ 'Call',!is.na(call_subtype) ~ 'Email'
+    (call_subtype == 'Call' & call_type == 'Call') ~ 'Call',
+    !is.na(call_subtype) ~ 'Email'
   )) %>%
   # Filter for just calls
   filter(label == "Call")
@@ -140,7 +136,7 @@ opp_calls <- full_join(opp_final, calls_final) %>%
 # Get support ticket pin
 support_tickets <- pin_read(board, "amanda/support_tickets")
 
-LSH_Ent_tickets <- support_tickets %>% 
+all_tickets <- support_tickets %>% 
   # fitler for just support tickets
   filter(group_name == "Support") %>% 
   select(ticket_id = id,
@@ -160,7 +156,7 @@ LSH_Ent_tickets <- support_tickets %>%
   mutate(ticket_summary = glue::glue('### [{ticket_id}]({ticket_link}) - {ticket_subject}\r\n**Date Opened**: {ticket_created}\r\n\n**Status**: {ticket_status}\r\n\n**Requester**: [{ticket_requester}]({ticket_requester_email})'))
   
 # Final ticket data
-ticket_final <- LSH_Ent_tickets %>% 
+ticket_final <- all_tickets %>% 
   select(event_subtype = ticket_status,
          event_date = ticket_created,
          event_label = ticket_label,
