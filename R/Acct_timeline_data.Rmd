@@ -141,7 +141,7 @@ opp_calls <- full_join(opp_final, calls_final) %>%
 support_tickets <- pin_read(board, "amanda/support_tickets")
 
 all_tickets <- support_tickets %>% 
-  # fitler for just support tickets
+  # filter for just support tickets
   filter(group_name == "Support") %>% 
   select(ticket_id = id,
          ticket_created = created_at,
@@ -176,10 +176,54 @@ ticket_final <- all_tickets %>%
   mutate(x_axis = 0)
 ```
 
+# SE Calls
+```{r}
+se_calls <- support_tickets %>% 
+  # filter for just SE calls
+  filter(group_name == "Sol-Eng") %>% 
+  select(ticket_id = id,
+         ticket_created = created_at,
+         ticket_solved_date = solved_at,
+         ticket_closed_at = closed_at,
+         ticket_subject = subject,
+         ticket_description = description,
+         ticket_priority = priority,
+         ticket_status = status, 
+         ticket_account = org_name,
+         ticket_requester = requester_name,
+         ticket_requester_email = requester_email) %>% 
+  filter(ticket_account %in% account_info$acct_name) %>% 
+  mutate(ticket_label = glue::glue('Sol-Eng Call')) %>%
+  mutate(ticket_link = glue::glue("https://rstudioide.zendesk.com/agent/tickets/{ticket_id}")) %>% 
+  mutate(ticket_summary = glue::glue('### [{ticket_id}]({ticket_link}) - {ticket_subject}\r\n**Date Opened**: {ticket_created}\r\n\n**Status**: {ticket_status}\r\n\n**Requester**: [{ticket_requester}]({ticket_requester_email})'))
+  
+# Final ticket data
+se_call_final <- se_calls %>% 
+  select(event_subtype = ticket_status,
+         event_date = ticket_created,
+         event_label = ticket_label,
+         event_notes = ticket_summary,
+         acct_name = ticket_account) %>% 
+  mutate(event_type = "SE Call") %>% 
+  left_join(account_info, by = "acct_name") %>% 
+  rename(event_acct_id = acct_id) %>% 
+  mutate(event_date = lubridate::as_date(event_date)) %>% 
+  select(event_type, event_subtype, event_date,
+         event_label, event_notes, event_acct_id, 
+         acct_name, acct_owner_id, acct_cs_owner_id) %>%
+  mutate(x_axis = 0)
+```
+
+# Join all SE and support tickets
+```{r}
+se_support_all <- ticket_final %>% 
+  full_join(se_call_final)
+```
+
 # Merge opp + call and tickets
 ```{r}
 final_data <- opp_calls %>% 
-  full_join(ticket_final) %>%
+  full_join(se_support_all) %>%
   # add in rep names
   left_join(reps, by = c("acct_owner_id" = "owner_id")) %>% 
   rename(acct_owner_name = rep_name) %>% 

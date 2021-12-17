@@ -31,7 +31,7 @@ ui <- fillPage(column(12, align="center",
                       
                       # Engagement Type
                       checkboxGroupInput("engagement_type", "",
-                                         choices = c("Sales", "CS", "Support"), 
+                                         choices = c("Sales", "CS", "Support", "SE Call"), 
                                          selected = c("Sales", "CS"), 
                                          inline = TRUE)),
                       # Plot
@@ -100,6 +100,9 @@ server <- function(input, output, session) {
       # Support points
       geom_point(data = filter(acct_filt(), event_type == "Support"),
                  fill = "#f94144", pch = 21, size = 3, color = "black") +
+      # SE Call points
+      geom_point(data = filter(acct_filt(), event_type == "SE Call"),
+                 fill = "#ffb703", pch = 21, size = 3, color = "black") +
       # Date labels
       geom_text(data = month_year_data, 
                 aes(y = date_range, 
@@ -118,7 +121,9 @@ server <- function(input, output, session) {
       geom_label_repel(data = filter(acct_filt(), event_type == "CS"),
                        aes(fill = event_subtype),nudge_x = 0.6, size = 2) +
       geom_label_repel(data = filter(acct_filt(), event_type == "Support"),
-                       aes(fill = event_subtype),nudge_x = -0.3, size = 2)
+                       aes(fill = event_subtype),nudge_x = -0.3, size = 2) +
+      geom_label_repel(data = filter(acct_filt(), event_type == "SE Call"),
+                       aes(fill = event_subtype),nudge_x = -0.1, size = 2)
   }, res = 96)
   
   # Shiny alert showing plot
