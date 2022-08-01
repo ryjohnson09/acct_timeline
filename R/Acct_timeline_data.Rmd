@@ -22,7 +22,7 @@ library(warehouse)
 con <- lakehouse()
 
 # Register Pin Board
-board <- board_rsconnect(server = Sys.getenv("CONNECT_SERVER"))
+board <- board_rsconnect(server = Sys.getenv("CONNECT_SERVER"), versioned = FALSE)
 ```
 
 # Extract Account and Opp information
@@ -228,7 +228,9 @@ final_data <- opp_calls %>%
   left_join(reps, by = c("acct_owner_id" = "owner_id")) %>% 
   rename(acct_owner_name = rep_name) %>% 
   left_join(reps, by = c("acct_cs_owner_id" = "owner_id")) %>% 
-  rename(acct_cs_owner_name = rep_name)
+  rename(acct_cs_owner_name = rep_name) %>% 
+  # Filter for events within N years
+  filter(event_date >= (lubridate::today() - lubridate::years(2)))
 ```
 
 
@@ -236,6 +238,6 @@ final_data <- opp_calls %>%
 ```{r}
 # Pin
 board %>% 
-  pin_write(final_data, "acct_timeline_data", type = "rds")
+  pin_write(final_data, "acct_timeline_data", type = "rds", versioned = FALSE)
 ```
 

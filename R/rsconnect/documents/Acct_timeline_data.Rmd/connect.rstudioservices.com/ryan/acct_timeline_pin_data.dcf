@@ -1,0 +1,13 @@
+name: acct_timeline_pin_data
+title: Acct_timeline_pin_data
+username: ryan
+account: ryan
+server: connect.rstudioservices.com
+hostUrl: https://connect.rstudioservices.com/__api__
+appId: 8897
+bundleId: 244837
+url: https://connect.rstudioservices.com/content/f9e08d86-2f94-476b-b7e0-8ad357b6fe61/
+when: 1659380285.79069
+lastSyncTime: 1659380285.7907
+asMultiple: FALSE
+asStatic: FALSE
